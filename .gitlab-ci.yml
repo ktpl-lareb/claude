@@ -1,0 +1,222 @@
+# You can override the included template(s) by including variable overrides
+# SAST customization: https://docs.gitlab.com/ee/user/application_security/sast/#customizing-the-sast-settings
+# Secret Detection customization: https://docs.gitlab.com/ee/user/application_security/secret_detection/#customizing-settings
+# Dependency Scanning customization: https://docs.gitlab.com/ee/user/application_security/dependency_scanning/#customizing-the-dependency-scanning-settings
+# Container Scanning customization: https://docs.gitlab.com/ee/user/application_security/container_scanning/#customizing-the-container-scanning-settings
+# Note that environment variables can be set in several places
+# See https://docs.gitlab.com/ee/ci/variables/#cicd-variable-precedence#
+# Include the SAST template
+include:
+  - template: Security/SAST.gitlab-ci.yml
+
+# Define the stages of your pipeline
+stages:
+  - Declaration
+  - GetDifference
+  - PHP-CodeSniffer
+  - PHP-MessDetector
+  - build
+  - test
+  - deploy
+  - review
+  - dast
+  - staging
+  - canary
+  - production
+  - incremental rollout 10%
+  - incremental rollout 25%
+  - incremental rollout 50%
+  - incremental rollout 100%
+  - performance
+  - cleanup
+
+# Define variables
+variables:
+  CHANGE_BRANCH: "$CI_COMMIT_REF_NAME"
+  CHANGE_TARGET: "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
+  TEMP_DIRECTORY: "/var/www/html/alphaci/temp_directory_$CI_MERGE_REQUEST_IID"
+  REPORT_FILENAME: "gl-sast-report.json"
+  SAST_EXCLUDED_ANALYZERS: "phpcs-security-audit, brakeman"
+  CI_DEBUG_TRACE: "true"
+
+# SAST job definition
+sast:
+  stage: test
+  script:
+    - echo "Running SAST..."
+  rules:
+    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "nil-development"
+  tags:
+    - vanillaci
+  allow_failure: true
+
+# Other jobs definitions...
+Declaration:
+  stage: Declaration
+  script:
+    - |
+      echo "Source branch: $CHANGE_BRANCH"
+      echo "Target branch: $CHANGE_TARGET"
+  rules:
+    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "nil-development"
+  tags:
+    - vanillaci
+
+GetDifference:
+  stage: GetDifference
+  script:
+    - echo "GetDifference stage placeholder"
+  tags:
+    - vanillaci
+  allow_failure: true
+  rules:
+    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "nil-development"
+
+create-directory:
+  stage: GetDifference
+  script:
+    - |
+      echo "Runner's username: $(whoami)"
+      cd /var/www/html/alphaci/
+      mkdir $TEMP_DIRECTORY
+      cd $TEMP_DIRECTORY
+      echo "Current Directory Path $(pwd)"
+  needs:
+    - GetDifference
+  rules:
+    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "nil-development"
+  tags:
+    - vanillaci
+
+git-configuration:
+  stage: GetDifference
+  script:
+    - |
+      echo "Current Path is: $(pwd)"
+      chown -R alphaci:alphaci $TEMP_DIRECTORY
+      echo "Enter into temp directory"
+      cd $TEMP_DIRECTORY
+      git init
+      git remote add origin https://vcs.krishtechnolabs.net/hemang/vanilla.git
+      sudo git config --global --add safe.directory $TEMP_DIRECTORY
+      sudo git config --global credential.helper store
+      sudo git config --global user.email "hemang.chhipani@krishtechnolabs.com"
+      sudo git config --global user.name "Hemang Chhipani"
+      cd $TEMP_DIRECTORY
+      git pull origin $CHANGE_BRANCH
+      echo "composer update start"
+      composer update
+      echo "composer installation start"
+      composer install
+  needs:
+    - create-directory
+  rules:
+    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "nil-development"
+  tags:
+    - vanillaci
+
+git-checkout:
+  stage: GetDifference
+  script:
+    - |
+      git fetch
+      echo "checkout target branch"
+      git checkout "$CHANGE_TARGET"
+      echo "checkout target complete"
+      echo "checkout source branch"
+      git checkout "$CHANGE_BRANCH"
+      echo "checkout source branch completed"
+      sudo chown -R alphaci:alphaci .
+  needs:
+    - git-configuration
+  rules:
+    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "nil-development"
+  tags:
+    - vanillaci
+
+changed-files:
+  stage: GetDifference
+  script:
+    - |
+      export CHANGED_FILES=$(sudo git diff --name-only origin/"$CHANGE_BRANCH"..origin/"$CHANGE_TARGET")
+      echo "$CHANGED_FILES" | sudo tee /var/www/html/alphaci/filepath/changed_files.txt
+      cat /var/www/html/alphaci/filepath/changed_files.txt
+  needs:
+    - git-checkout
+  rules:
+    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "nil-development"
+  tags:
+    - vanillaci
+
+PHP-CodeSniffer:
+  stage: PHP-CodeSniffer
+  needs:
+    - changed-files
+  script:
+    - echo "Start CodeSniffer in temp_directory"
+    - cd $TEMP_DIRECTORY
+    - echo "$(pwd)"
+    - git init
+    - git config --global --add safe.directory $TEMP_DIRECTORY
+    - git config --global credential.helper store
+    - git config --global user.email "harpal.gohil@krishtechnolabs.com"
+    - git config --global user.name "harpal gohil"
+    - git fetch
+    - git pull origin $CHANGE_BRANCH
+    - export CHANGED_FILES=$(git diff --name-only origin/"$CHANGE_BRANCH"..origin/"$CHANGE_TARGET")
+    - export changedFilesSpace=$(echo "$CHANGED_FILES" | tr '\n' ' ')
+    - echo "$changedFilesSpace" | tee /var/www/html/alphaci/filepath/changed_files_withspace.txt
+    - cat /var/www/html/alphaci/filepath/changed_files_withspace.txt
+    - |
+      for file in $changedFilesSpace; do
+        if [ -f "$file" ]; then
+          vendor/bin/phpcs "$file" --standard=Magento2 -s -n
+        else
+          echo "File $file does not exist. Skipping phpcs for this file."
+        fi
+      done
+  rules:
+    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "nil-development"
+  tags:
+    - vanillaci
+  allow_failure: true
+
+PHP-MessDetector:
+  stage: PHP-MessDetector
+  needs:
+    - PHP-CodeSniffer
+  script:
+    - cd $TEMP_DIRECTORY
+    - git fetch
+    - git pull origin $CHANGE_BRANCH
+    - export CHANGED_FILES=$(git diff --name-only origin/$CHANGE_BRANCH..origin/$CHANGE_TARGET)
+    - export changedFilesWithComma=$(echo "$CHANGED_FILES" | paste -sd "," -)
+    - echo "$changedFilesWithComma" | tee /var/www/html/alphaci/filepath/changed_files_withcomma.txt
+    - |
+      for file in $CHANGED_FILES; do
+        if [ -f "$file" ]; then  # Check if file exists
+          vendor/bin/phpmd "$file" ansi dev/tests/static/testsuite/Magento/Test/Php/_files/phpmd/ruleset.xml  # Run PHPMD on the file
+        else
+          echo "File $file does not exist. Skipping PHPMD for this file."  # Print message if file doesn't exist
+        fi
+      done
+  rules:
+    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "nil-development"
+  tags:
+    - vanillaci
+  allow_failure: true
+
+# sast:
+#   stage: test
+#   rules:
+#     - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "nil-development"
+#   tags:
+#     - vanillaci
+#   allow_failure: true
+
+# Include the Auto-DevOps template for general CI/CD automation
+# include:
+#   - template: Auto-DevOps.gitlab-ci.yml
+
+# Define other jobs and their configurations as needed...
+
