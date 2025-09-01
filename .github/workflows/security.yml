@@ -21,4 +21,4 @@ jobs:
       - uses: anthropics/claude-code-security-review@main
         with:
           comment-pr: true
-          claude-api-key: ${{ secrets.CLAUDE_API_KEY }}
+          claude-api-key: "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"
