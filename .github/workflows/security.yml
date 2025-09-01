@@ -1,31 +1,33 @@
 name: Security Review
 
 permissions:
-  pull-requests: write
   contents: read
+  pull-requests: write
 
 on:
   pull_request:
     branches:
-      - main   
+      - main
 
 jobs:
   security:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 2
-      
-      - uses: anthropics/claude-code-security-review@main
+
+      - name: Run ClaudeCode Security Review
         id: claudecode
+        uses: anthropics/claude-code-security-review@main
         with:
           comment-pr: true
           claude-api-key: ${{ secrets.CLAUDE_API_KEY }}
-          
-       main
+
       - name: Upload ClaudeCode Results
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: claudecode-results

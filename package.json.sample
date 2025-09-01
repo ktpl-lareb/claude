@@ -12,7 +12,7 @@
     "glob": "~8.1.0",
     "grunt": "~1.6.1",
     "grunt-banner": "~0.6.0",
-    "grunt-continue": "~0.2.0",
+    "grunt-continue": "~0.2.1",
     "grunt-contrib-clean": "~2.0.1",
     "grunt-contrib-connect": "~4.0.0",
     "grunt-contrib-cssmin": "~5.0.0",
