@@ -26,43 +26,10 @@ jobs:
           comment-pr: true
           claude-api-key: ${{ secrets.CLAUDE_API_KEY }}
 
-      - name: Convert results JSON to CSV
-        if: always()
-        run: |
-          python - <<'EOF'
-          import json, csv
-          from pathlib import Path
-
-          infile = Path("claudecode-results.json")
-          outfile = Path("claudecode-results.csv")
-
-          if infile.exists():
-              data = json.loads(infile.read_text())
-
-              # Flatten summary into one row
-              row = {
-                  "repo": data.get("repo", ""),
-                  "pr_number": data.get("pr_number", ""),
-                  "files_reviewed": data.get("analysis_summary", {}).get("files_reviewed", ""),
-                  "high_severity": data.get("analysis_summary", {}).get("high_severity", ""),
-                  "medium_severity": data.get("analysis_summary", {}).get("medium_severity", ""),
-                  "low_severity": data.get("analysis_summary", {}).get("low_severity", ""),
-                  "review_completed": data.get("analysis_summary", {}).get("review_completed", ""),
-                  "total_findings": len(data.get("findings", []))
-              }
-
-              with outfile.open("w", newline="") as f:
-                  writer = csv.DictWriter(f, fieldnames=row.keys())
-                  writer.writeheader()
-                  writer.writerow(row)
-          else:
-              print("⚠️ No claudecode-results.json found")
-          EOF
-
-      - name: Upload ClaudeCode Results CSV
+      - name: Upload ClaudeCode Results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: claudecode-results-csv
-          path: claudecode-results.csv
+          name: claudecode-results
+          path: claudecode-results.json
           if-no-files-found: warn
