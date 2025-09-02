@@ -25,11 +25,3 @@ jobs:
         with:
           comment-pr: true
           claude-api-key: ${{ secrets.CLAUDE_API_KEY }}
-
-      - name: Upload ClaudeCode Results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: claudecode-results
-          path: claudecode-results.json
-          if-no-files-found: warn

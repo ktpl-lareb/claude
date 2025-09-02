@@ -9,7 +9,7 @@
 #    listen 80;
 #    server_name mage.dev;
 #    set $MAGE_ROOT /var/www/magento2;
-#    set $MAGE_DEBUG_SHOW_ARGS 0;
+##    set $MAGE_DEBUG_SHOW_ARGS 0;
 #    include /vagrant/magento2/nginx.conf.sample;
 # }
 #
